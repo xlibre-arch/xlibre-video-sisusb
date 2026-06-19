@@ -1,53 +1,39 @@
-# Maintainer: artist for Artix Linux and XLibre <artist@artixlinux.org>
+# Maintainer: callmetango
+# Contributor: artist <artist@artixlinux.org>
+# Contributor: Vitalii Kuzhdin <vitaliikuzhdin@gmail.com>
+# Contributor: AndyRTR <andyrtr@archlinux.org>
+# Contributor: Jan de Groot <jgc@archlinux.org>
 
 pkgname=xlibre-video-sisusb
+_pkgname=xf86-video-sisusb
 pkgver=25.0.0
-pkgrel=5
-pkgdesc="XLibre fork of X.org SiS USB video driver"
-arch=(x86_64 aarch64)
+pkgrel=6
+pkgdesc="XLibre SiS USB video driver"
+arch=(x86_64)
+url='https://github.com/X11Libre/xf86-video-sisusb'
 license=('BSD-3-Clause')
-_pkgname="${pkgname//xlibre/xf86}"
-url="https://github.com/X11Libre/${_pkgname}"
-depends=("xlibre-xserver>=${pkgver%.*}" 'glibc')
-makedepends=("xlibre-xserver-devel>=${pkgver%.*}" 'xorgproto')
-conflicts=("${_pkgname}")
-provides=("${_pkgname}")
-source=("${url}/archive/refs/tags/xlibre-${_pkgname}-${pkgver}.tar.gz")
+depends=('glibc' 'xlibre-xserver')
+makedepends=('xlibre-xserver-devel' 'X-ABI-VIDEODRV_VERSION=28.0')
+conflicts=('xf86-video-sisusb' 'X-ABI-VIDEODRV_VERSION<28' 'X-ABI-VIDEODRV_VERSION>=29')
 groups=('xlibre-drivers')
+source=("${url}/archive/refs/tags/xlibre-${_pkgname}-${pkgver}.tar.gz")
+sha256sums=('470d8cb446797efb133e1a54bf1c1048804cd70843b3fce13700c0b01deeca4d')
+
+prepare() {
+  cd ${_pkgname}-xlibre-${_pkgname}-${pkgver}
+  NOCONFIGURE=1 ./autogen.sh
+}
 
 build() {
-  case "$CARCH" in
-    "x86_64")
-      CFLAGS=" -march=x86-64"
-      ;;
-    "aarch64")
-      CFLAGS=" -march=armv8-a"
-      ;;
-    *)
-      CFLAGS=" -march=native"
-      ;;
-  esac
-  CFLAGS+=" -mtune=generic -O2 -pipe -fexceptions -Wp,-D_FORTIFY_SOURCE=3 -Wformat -Werror=format-security"
-  CFLAGS+=" -fstack-clash-protection -fno-omit-frame-pointer -mno-omit-leaf-frame-pointer"
-  LDFLAGS=" -Wl,-O1 -Wl,--sort-common -Wl,--as-needed -Wl,-z,lazy -Wl,-z,relro -Wl,-z,pack-relative-relocs"
-  if [[ $CARCH != 'aarch64' ]]; then
-    CFLAGS+=" -fcf-protection"
-  fi
-  if [[ "$_pkgname" == *"xf86-input"* ]]; then
-    CFLAGS+=" -fno-plt"
-    LDFLAGS+=" -Wl,-z,now"
-  fi
-  if [[ "$_pkgname" == *"xf86-video-intel"* ]]; then
-    CFLAGS+=" -fno-lto"
-    LDFLAGS+=" -fno-lto"
-  fi
-  CXXFLAGS="${CFLAGS} -Wp,-D_GLIBCXX_ASSERTIONS"
-  export CFLAGS="${CFLAGS}"
-  export CXXFLAGS="${CXXFLAGS}"
-  export LDFLAGS="${LDFLAGS}"
-
   cd ${_pkgname}-xlibre-${_pkgname}-${pkgver}
-  ./autogen.sh
+
+  # Since pacman 5.0.2-2, hardened flags are now enabled in makepkg.conf
+  # With them, module fail to load with undefined symbol.
+  # See https://bugs.archlinux.org/task/55102 / https://bugs.archlinux.org/task/54845
+  export CFLAGS=${CFLAGS/-fno-plt}
+  export CXXFLAGS=${CXXFLAGS/-fno-plt}
+  export LDFLAGS=${LDFLAGS/-Wl,-z,now}
+
   ./configure --prefix=/usr
   make
 }
@@ -55,7 +41,6 @@ build() {
 package() {
   cd ${_pkgname}-xlibre-${_pkgname}-${pkgver}
   make DESTDIR="${pkgdir}" install
-  install -Dm644 "${srcdir}"/${_pkgname}-xlibre-${_pkgname}-${pkgver}/COPYING "${pkgdir}"/usr/share/licenses/${pkgname}/LICENSE
+  install -m755 -d "${pkgdir}/usr/share/licenses/${pkgname}"
+  install -m644 COPYING "${pkgdir}/usr/share/licenses/${pkgname}/"
 }
-
-sha256sums=('470d8cb446797efb133e1a54bf1c1048804cd70843b3fce13700c0b01deeca4d')
